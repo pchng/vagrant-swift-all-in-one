@@ -44,6 +44,23 @@ execute "git swift-specs" do
   action :run
 end
 
+# TODO: PC: This creates the folder as root, how to change? How come others were created with owner "vagrant"?
+# DevStack for Keystone and Barbican.
+execute "git devstack" do
+  cwd "/home/vagrant" # Do not put in shared/sync'd folder, because DevStack uses virtualenvs, whose symlinks may cause issues on Windows systems.
+  command "git clone -b #{node['devstack_repo_branch']} #{node['devstack_repo']}"
+  user "vagrant"
+  creates "/home/vagrant/devstack"
+  action :run
+end
+
+execute "git castellan" do
+  cwd "/vagrant"
+  command "git clone -b #{node['castellan_repo_branch']} #{node['castellan_repo']}"
+  creates "/vagrant/castellan"
+  action :run
+end
+
 execute "fix semantic_version error from testtools" do
   command "pip install --upgrade testtools"
 end
@@ -106,3 +123,27 @@ end
   end
 end
 
+# Add Keystone and Barbican.
+cookbook_file "/home/vagrant/devstack/local.conf" do
+  source "devstack/local.conf"
+  owner "vagrant"
+  group "vagrant"
+end
+
+execute "install devstack" do
+  # Run as user "vagrant" using a su shell, otherwise some resources are pip install'd using 
+  # root, which causes permissions issues.
+  # http://serverfault.com/questions/402881/execute-as-vagrant-user-not-root-with-chef-solo
+  command "su vagrant -l -c 'cd /home/vagrant/devstack && ./stack.sh'"
+  creates "/opt/stack"
+end
+
+# Castellan
+execute "install" do
+  cwd "/vagrant/castellan"
+  command "pip install -e . && pip install -r test-requirements.txt"
+  if not node['full_reprovision']
+    creates "/usr/local/lib/python2.7/dist-packages/castellan.egg-link"
+  end
+  action :run
+end

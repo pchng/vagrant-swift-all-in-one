@@ -213,3 +213,38 @@ cookbook_file "/etc/swift/container-reconciler.conf.d/20_settings.conf" do
   owner "vagrant"
   group "vagrant"
 end
+
+# Configure Keystone for Swift here, since Swift was not installed via DevStack.
+# http://thornelabs.net/2014/07/16/authenticate-openstack-swift-against-keystone-instead-of-tempauth.html
+
+# TODO: PC: Put admin, swift username and passwords into Vagrantfile configuration?
+[
+  'openstack user create --project service --password openstack swift',
+  'openstack role add --project service --user swift admin',
+  'openstack service create --name swift --description "swift storage service" object-store',
+
+  # NOTE: The format of `endpoint create` changed from identity version 2 to 3.
+  # V2: Endpoints are treated as a single entry/record with separate {public, internal, admin} URL properties/columns.
+  # V3: Each (service name, service type, url) tuple is treated as a separate endpoint entry/record.
+  "openstack endpoint create --region RegionOne swift admin \"http://#{node['hostname']}:8080\"",
+  "openstack endpoint create --region RegionOne swift public \"http://#{node['hostname']}:8080/v1/AUTH_%(tenant_id)s\"",
+  "openstack endpoint create --region RegionOne swift internal \"http://#{node['hostname']}:8080/v1/AUTH_%(tenant_id)s\"",
+].each do |command|
+  execute "keystone configuration - #{command}" do
+    # TODO: PC: Check if command was already run by querying via proper openstack CLI command?
+    command "su vagrant -l -c '#{command}'"
+  end
+end
+
+# TODO: PC: Reduce repetition, i.e. "swift_secret" name, by putting into a configuration parameter.
+# Configure Swift to use Castellan/Barbican by creating a secret in Barbican that the Swift Castellan keymaster will use.
+[
+  "barbican secret store --name swift_secret -p '#{node['swift_barbican_secret']}'",
+  # TODO: PC: Use this Swift-Barbican UUID in the Swift proxy-server configuration for 
+  # "acc_key_uuid" of the Castellan keymaster.
+  "barbican secret list --name swift_secret -c 'Secret href' -f value | awk -F '/' '{print \\$6}' > acc_key_uuid"
+].each do |command|
+  execute "swift castellan/barbican configuration - #{command}" do
+    command "su vagrant -l -c \"#{command}\""
+  end
+end

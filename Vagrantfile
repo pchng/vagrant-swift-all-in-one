@@ -62,7 +62,12 @@ local_config = {
   "swift_bench_repo_branch" => (ENV['SWIFTBENCH_REPO_BRANCH'] || 'master'),
   "swift_specs_repo" => (ENV['SWIFTSPECS_REPO'] || 'git://github.com/openstack/swift-specs.git'),
   "swift_specs_repo_branch" => (ENV['SWIFTSPECS_REPO_BRANCH'] || 'master'),
+  "devstack_repo" => (ENV['DEVSTACK_REPO'] || 'git://github.com/openstack-dev/devstack.git'),
+  "devstack_repo_branch" => (ENV['DEVSTACK_REPO_BRANCH'] || 'master'),
+  "castellan_repo" => (ENV['CASTELLAN_REPO'] || 'https://github.com/openstack/castellan'),
+  "castellan_repo_branch" => (ENV['CASTELLAN_REPO_BRANCH'] || 'master'),
   "extra_key" => (ENV['EXTRA_KEY'] || ''),
+  "swift_barbican_secret" => (ENV['SWIFT_BARBICAN_SECRET'] || '<DEFAULT SWIFT BARBICAN SECRET PAYLOAD VALUE>'),
 }
 
 
@@ -83,7 +88,7 @@ Vagrant.configure("2") do |global_config|
       config.vm.provider :virtualbox do |vb|
         vb.name = "vagrant-#{hostname}-#{current_datetime}"
         vb.cpus = Integer(ENV['VAGRANT_CPUS'] || 1)
-        vb.memory = Integer(ENV['VAGRANT_RAM'] || 1024)
+        vb.memory = Integer(ENV['VAGRANT_RAM'] || 2048)
         if (ENV['GUI'] || false)  # Why is my VM hung on boot? Find out!
           vb.gui = true
         end

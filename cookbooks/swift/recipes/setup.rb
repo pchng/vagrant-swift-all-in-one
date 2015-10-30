@@ -48,6 +48,7 @@ required_packages = [
   "curl", "gcc", "memcached", "rsync", "sqlite3", "xfsprogs", "git-core",
   "build-essential", "libffi-dev", "python-dev",
   "libxml2-dev", "libxml2", "libxslt1-dev",
+  "jq"
 ]
 extra_packages = node['extra_packages']
 (required_packages + extra_packages).each do |pkg|
@@ -79,12 +80,19 @@ execute "update-path" do
   action :run
 end
 
+# TODO: PC: Put port numbers, etc. into Vagrant/Chef node configuration instead of being hard-coded/static?
+# - Aim: Reduce duplication by also using the values to fill out template files for configuration, etc.
+
 # swift command line env setup
 
 {
-  "ST_AUTH" => "http://#{node['hostname']}:8080/auth/v1.0",
-  "ST_USER" => "test:tester",
-  "ST_KEY" => "testing",
+  # "ST_AUTH" => "http://#{node['hostname']}:8080/auth/v1.0",
+  # "ST_USER" => "test:tester",
+  # "ST_KEY" => "testing",
+  "ST_AUTH" => "http://#{node['hostname']}:5000/v3/",
+  "ST_USER" => "admin:admin", # TODO: PC: Change to a "test" user, "test_project" project and create in Keystone?
+  "ST_KEY" => "openstack",
+  "ST_AUTH_VERSION" => "3",
 }.each do |var, value|
   execute "swift-env-#{var}" do
     command "echo 'export #{var}=#{value}' >> /home/vagrant/.profile"
@@ -101,6 +109,37 @@ end
   execute "swift-env-#{var}" do
     command "echo 'export #{var}=#{value}' >> /home/vagrant/.profile"
     not_if "grep #{var} /home/vagrant/.profile"
+    action :run
+  end
+end
+
+# openstack command line env setup
+{
+  "OS_AUTH_URL" => "http://#{node['hostname']}:5000/v3", # Barbican requires OS_AUTH_URL to point to a specific versioned URL.
+  "OS_PROJECT_NAME" => "admin",
+  "OS_USERNAME" => "admin",
+  "OS_PASSWORD" => "openstack",
+
+  # Needed for Barbican CLI
+  "OS_PROJECT_DOMAIN_ID" => "default",
+  "OS_USER_DOMAIN_ID" => "default",
+  "OS_IDENTITY_API_VERSION" => "3", # Barbican CLI outputs a warning if OS_IDENTITY_API_VERSION is not specified, and uses 3 by default.
+  "BARBICAN_ENDPOINT" => "http://#{node['hostname']}:9311",
+}.each do |var, value|
+  execute "os-env-#{var}" do
+    command "echo 'export #{var}=#{value}' >> /home/vagrant/.profile"
+    not_if "grep #{var} /home/vagrant/.profile"
+    action :run
+  end
+end
+
+# Useful aliases
+{
+  "os" => "openstack",
+}.each do |var, value|
+  execute "swift-env-alias-#{var}" do
+    command "echo 'alias #{var}=#{value}' >> /home/vagrant/.profile"
+    not_if "grep '^alias #{var}' /home/vagrant/.profile"
     action :run
   end
 end
